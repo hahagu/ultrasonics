@@ -709,7 +709,7 @@ def run(settings_dict, **kwargs):
                         f"Could not find song {song['title']} in Spotify; will not add to playlist."
                     )
 
-            if settings_dict["existing_playlists"] == "Update":
+            if settings_dict["playlist_mode"] == "Update":
                 # Remove any songs which aren't in `uris` from the playlist
                 remove_uris = [
                     uri for uri in existing_uris if uri not in uris + duplicate_uris
@@ -719,17 +719,28 @@ def run(settings_dict, **kwargs):
                     playlist_id, remove_uris
                 )
 
-            # Add tracks to playlist in batches of 100
-            while len(uris) > 100:
-                s.request(
-                    s.sp.user_playlist_add_tracks, s.user_id, playlist_id, uris[0:100]
-                )
 
-                uris = uris[100:]
+            if settings_dict["playlist_mode"] != "Songs":
+                # Add tracks to playlist in batches of 100
+                while len(uris) > 100:
+                    s.request(
+                        s.sp.user_playlist_add_tracks, s.user_id, playlist_id, uris[0:100]
+                    )
 
-            # Add all remaining tracks
-            if uris:
-                s.request(s.sp.user_playlist_add_tracks, s.user_id, playlist_id, uris)
+                    uris = uris[100:]
+
+                # Add all remaining tracks
+                if uris:
+                    s.request(s.sp.user_playlist_add_tracks, s.user_id, playlist_id, uris)
+
+            else:
+                # Add tracks one by one
+                while len(uris) > 0:
+                    processUri = uris.pop()
+                    s.request(
+                        s.sp.current_user_saved_tracks_add, [processUri]
+                    )
+                    time.sleep(100 / 1000) # 100ms (for keeping order of songs)
 
 
 def builder(**kwargs):
@@ -846,10 +857,10 @@ def builder(**kwargs):
             },
             {
                 "type": "radio",
-                "label": "Existing Playlists",
-                "name": "existing_playlists",
-                "id": "existing_playlists",
-                "options": ["Append", "Update"],
+                "label": "Playlist Mode",
+                "name": "playlist_mode",
+                "id": "playlist_mode",
+                "options": ["Append", "Update", "Songs"],
                 "required": True,
             },
         ]
